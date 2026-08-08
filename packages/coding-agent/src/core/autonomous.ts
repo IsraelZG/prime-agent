@@ -5,7 +5,7 @@ import { lstat, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { AssistantMessage, Usage, UserMessage } from "@earendil-works/pi-ai";
 import { waitForChildProcess } from "../utils/child-process.js";
-import { killProcessTree, trackDetachedChildPid, untrackDetachedChildPid } from "../utils/shell.js";
+import { getShellConfig, killProcessTree, trackDetachedChildPid, untrackDetachedChildPid } from "../utils/shell.js";
 
 export interface AgentAutonomousConfig {
 	enabled?: boolean;
@@ -309,9 +309,24 @@ async function runAutonomousQualityGates(
 			};
 			return attempt > state.gates.maxRetries ? "retry_exhausted" : "failed";
 		}
-		const result = await runChildProcess(command, [], {
+		// Gates are POSIX shell commands, and the bash tool already runs them in
+		// bash. `shell: true` would hand them to ComSpec (cmd.exe) on Windows, so
+		// the same command an agent verified with the bash tool fails as a gate.
+		// Fall back to the platform shell only when no bash is available.
+		let gateFile = command;
+		let gateArgs: string[] = [];
+		let gateShell = true;
+		try {
+			const shellConfig = getShellConfig();
+			gateFile = shellConfig.shell;
+			gateArgs = [...shellConfig.args, command];
+			gateShell = false;
+		} catch {
+			// No shell resolved; keep the platform default.
+		}
+		const result = await runChildProcess(gateFile, gateArgs, {
 			cwd,
-			shell: true,
+			shell: gateShell,
 			timeoutMs: state.gates.timeoutMs,
 			maxOutputChars: MAX_GATE_OUTPUT_CHARS,
 			signal,
