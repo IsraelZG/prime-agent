@@ -376,6 +376,7 @@ function run(command: string, args: string[], options: { stdio?: "ignore" | "inh
 		const child = spawn(command, args, {
 			env: process.env,
 			stdio: options.stdio ?? "ignore",
+			windowsHide: true,
 		});
 		child.on("error", reject);
 		child.on("exit", (code, signal) => {
@@ -718,6 +719,21 @@ async function hashRuntimeSource(sourceDir: string): Promise<string> {
 	return `sha256:${hash.digest("hex")}`;
 }
 
+/**
+ * Python request passed to `uv python install` / `uv venv`.
+ *
+ * On Windows arm64 a bare version makes uv pick an emulated x86_64 build,
+ * because it treats native aarch64 support as immature. The emulated
+ * interpreter then pulls win_amd64 wheels for numpy, scipy and friends and
+ * runs the whole kernel under Prism. Request the native build explicitly.
+ */
+function kernelPythonRequest(): string {
+	if (process.platform === "win32" && process.arch === "arm64") {
+		return `cpython-${PYTHON_VERSION}-windows-aarch64-none`;
+	}
+	return PYTHON_VERSION;
+}
+
 /** Interpreter path inside a venv. Windows venvs use `Scripts\python.exe`. */
 function venvPython(venv: string): string {
 	return process.platform === "win32" ? path.join(venv, "Scripts", "python.exe") : path.join(venv, "bin", "python");
@@ -735,8 +751,9 @@ async function bootstrapVenv(
 	const runtimeRequirement = sourceDir ?? RUNTIME_REQUIREMENT;
 	const runtimeIdentity = await resolveRuntimeIdentity();
 
-	await run(uv, ["python", "install", PYTHON_VERSION]);
-	await run(uv, ["venv", venv, "--python", PYTHON_VERSION, "--seed"]);
+	const pythonRequest = kernelPythonRequest();
+	await run(uv, ["python", "install", pythonRequest]);
+	await run(uv, ["venv", venv, "--python", pythonRequest, "--seed"]);
 	await run(uv, [
 		"pip",
 		"install",
