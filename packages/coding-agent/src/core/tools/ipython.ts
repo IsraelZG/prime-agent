@@ -297,7 +297,10 @@ export interface IpythonToolOptions {
 }
 
 function quoteScriptMagicArgument(value: string): string {
-	return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : `'${value.replace(/'/g, "'\"'\"'")}'`;
+	if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
+	// IPython's arg_split is non-POSIX on Windows: single quotes stay literal, so
+	// `%%script '<path>'` fails to find the program while still reporting ok.
+	return process.platform === "win32" ? `"${value.replace(/"/g, '\\"')}"` : `'${value.replace(/'/g, "'\"'\"'")}'`;
 }
 
 function applyShellSettingsToBashMagicCell(
