@@ -115,6 +115,38 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: ${{ matrix.command }}
 
+  # Windows has never been exercised by CI, so the platform branches and the
+  # Windows-only tests (describe.skipIf(process.platform !== "win32")) have
+  # always been skipped. Reporting only until the backlog it surfaces is paid
+  # down; keep it out of the build-check-test gate.
+  test-windows:
+    name: Test (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install uv
+        run: python -m pip install uv
+
+      - name: Test
+        working-directory: packages/coding-agent
+        run: npm run test:ci
+
   build-check-test:
     name: build-check-test
     if: always()
