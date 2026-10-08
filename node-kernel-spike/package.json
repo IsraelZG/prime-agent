@@ -1,0 +1,6 @@
+{
+  "name": "node-kernel-spike",
+  "private": true,
+  "type": "commonjs",
+  "description": "Prototipo de kernel Node persistente para avaliar substituicao do kernel IPython. Zero dependencias."
+}
